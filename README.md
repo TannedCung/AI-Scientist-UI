@@ -55,9 +55,9 @@ The AI Scientist Paper Generator is a full-stack application that automates the 
    ```
 
 4. Access the application:
-   - Frontend: http://localhost:3000
-   - API: http://localhost:8000/api
-   - API Docs: http://localhost:8000/api/docs
+   - Frontend: http://localhost:3001
+   - API: http://localhost:8001/api
+   - API Docs: http://localhost:8001/api/docs
 
 ## Documentation
 
@@ -87,6 +87,15 @@ npm install
 npm run dev
 ```
 
+### Version Control
+
+This project includes comprehensive Git configuration:
+
+- `.gitignore` files (root, frontend, and backend) to exclude build artifacts, dependencies, and environment-specific files
+- `.gitattributes` for consistent line endings and binary file handling
+
+When contributing to this project, please make sure your IDE respects these configurations to maintain a clean repository and minimize potential merge conflicts.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
@@ -94,3 +103,13 @@ This project is licensed under the [MIT License](LICENSE).
 ## Acknowledgements
 
 This project integrates with the [AI-Scientist-v2](https://github.com/SakanaAI/AI-Scientist-v2) framework developed by SakanaAI.
+
+## Accessing the Application
+
+After running the application with Docker Compose, you can access:
+
+- Frontend: http://localhost:3001 
+- Backend API: http://localhost:8001/api
+- API Documentation: http://localhost:8001/api/docs 
+
+> Note: The ports have been configured to avoid conflicts with standard ports that might be in use on your system (3000, 5432, 8000).
