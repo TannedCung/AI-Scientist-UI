@@ -1,0 +1,3 @@
+[submodule "backend/app/services/AI-Scientist-v2"]
+	path = backend/app/services/AI-Scientist-v2
+	url = https://github.com/SakanaAI/AI-Scientist-v2
