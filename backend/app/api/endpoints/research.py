@@ -8,17 +8,20 @@ from datetime import datetime
 
 from ...db.database import get_db
 from ...models.schema import (
-    ResearchIdea, ExperimentRun, ExperimentResult,
-    ResearchIdeaResponse, ExperimentRunResponse,
-    ResearchIdeaCreate
+    GenerateIdeasResponse, ResearchIdea, ExperimentRun, ExperimentResult,
+    ResearchIdeaResponse, ExperimentRunResponse, ResearchIdeaCreate,
+    IdeaStatus
 )
 from ...services.storage import r2_storage
-from ...services.ai_scientist_wrapper import ai_scientist
+from ...services.ai_scientist_wrapper import ai_scientist, AIScientistWrapper
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def get_ai_scientist() -> AIScientistWrapper:
+    return ai_scientist
 
 @router.post("/ideas", response_model=ResearchIdeaResponse)
 async def create_research_idea(
@@ -29,51 +32,20 @@ async def create_research_idea(
     code_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db)
 ):
-    """Create a new research idea and generate initial hypotheses."""
+    """Create a new research idea."""
     try:
         logger.info(f"Creating new research idea: {title}")
         
         # Generate unique ID for the research idea
         idea_id = str(uuid.uuid4())
         
-        # Create directory structure
-        idea_dir = f"ideas/{idea_id}"
-        os.makedirs(idea_dir, exist_ok=True)
-        
-        # Create markdown file content
-        markdown_content = f"""# {title}
-
-## Keywords
-{keywords}
-
-## TL;DR
-{tldr}
-
-## Abstract
-{abstract}
-"""
-        
-        # Save markdown file locally
-        markdown_path = f"{idea_dir}/{idea_id}.md"
-        with open(markdown_path, "w") as f:
-            f.write(markdown_content)
-        
-        # Upload markdown file to R2
-        markdown_key = f"{idea_dir}/{idea_id}.md"
-        markdown_url = await r2_storage.upload_file(markdown_path, markdown_key)
-        logger.info(f"Uploaded markdown file to R2: {markdown_key}")
-        
         # Handle code file if provided
         code_file_path = None
         if code_file:
             logger.info(f"Processing code file: {code_file.filename}")
-            code_path = f"{idea_dir}/{idea_id}.py"
-            with open(code_path, "wb") as f:
-                content = await code_file.read()
-                f.write(content)
-            
-            code_key = f"{idea_dir}/{idea_id}.py"
-            code_url = await r2_storage.upload_file(code_path, code_key)
+            code_key = f"ideas/{idea_id}/{idea_id}.py"
+            content = await code_file.read()
+            await r2_storage.upload_bytes(content, code_key)
             code_file_path = code_key
             logger.info(f"Uploaded code file to R2: {code_key}")
         
@@ -84,9 +56,8 @@ async def create_research_idea(
             keywords=keywords,
             tldr=tldr,
             abstract=abstract,
-            markdown_file_path=markdown_key,
             code_file_path=code_file_path,
-            created_at=datetime.now()
+            status=IdeaStatus.DRAFT
         )
         db.add(research_idea)
         db.commit()
@@ -96,7 +67,7 @@ async def create_research_idea(
         # Generate initial hypotheses using AI Scientist
         try:
             logger.info(f"Generating initial hypotheses for idea: {idea_id}")
-            await ai_scientist.generate_ideas(idea_id, db)
+            await ai_scientist.generate_ideas(research_idea, db)
             logger.info(f"Successfully generated hypotheses for idea: {idea_id}")
         except Exception as e:
             logger.error(f"Failed to generate initial hypotheses for idea {idea_id}: {str(e)}")
@@ -136,24 +107,37 @@ async def get_research_idea(idea_id: str, db: Session = Depends(get_db)):
         logger.error(f"Error fetching research idea {idea_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/ideas/{idea_id}/generate", response_model=dict)
-async def generate_research_hypotheses(idea_id: str, db: Session = Depends(get_db)):
-    """Generate research hypotheses for a specific idea."""
+@router.post("/ideas/{idea_id}/generate", response_model=GenerateIdeasResponse)
+async def generate_ideas(
+    idea_id: str,
+    db: Session = Depends(get_db),
+    ai_scientist_service: AIScientistWrapper = Depends(get_ai_scientist)
+):
+    """Generate research ideas for a specific research idea."""
     try:
-        logger.info(f"Generating hypotheses for idea: {idea_id}")
-        result = await ai_scientist.generate_ideas(idea_id, db)
-        logger.info(f"Successfully generated hypotheses for idea: {idea_id}")
-        return result
+        # Get the research idea
+        research_idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
+        if not research_idea:
+            raise HTTPException(status_code=404, detail="Research idea not found")
+
+        # Generate ideas
+        response = await ai_scientist_service.generate_ideas(research_idea, db)
+        return response
+
     except Exception as e:
-        logger.error(f"Error generating hypotheses for idea {idea_id}: {str(e)}")
+        logger.error(f"Error generating ideas: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/ideas/{idea_id}/experiments", response_model=ExperimentRunResponse)
-async def run_experiment(idea_id: str, db: Session = Depends(get_db)):
+async def run_experiment(
+    idea_id: str,
+    db: Session = Depends(get_db),
+    ai_scientist_service: AIScientistWrapper = Depends(get_ai_scientist)
+):
     """Run an experiment for a specific research idea."""
     try:
         logger.info(f"Starting experiment for idea: {idea_id}")
-        result = await ai_scientist.run_experiment(idea_id, db)
+        result = await ai_scientist_service.run_experiment(idea_id, db)
         logger.info(f"Successfully completed experiment for idea: {idea_id}")
         return result
     except Exception as e:
