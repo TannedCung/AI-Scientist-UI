@@ -6,8 +6,21 @@ import uuid
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from enum import Enum
 
 Base = declarative_base()
+
+class IdeaStatus(str, Enum):
+    DRAFT = "draft"
+    GENERATING = "generating"
+    GENERATED = "generated"
+    FAILED = "failed"
+
+class ExperimentStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 class ResearchIdea(Base):
     """Model for storing research ideas and their metadata."""
@@ -20,6 +33,9 @@ class ResearchIdea(Base):
     abstract = Column(Text, nullable=False)
     markdown_file_path = Column(String, nullable=False)
     code_file_path = Column(String, nullable=True)
+    status = Column(String, nullable=False, default=IdeaStatus.DRAFT)
+    ideas_json_url = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -32,9 +48,10 @@ class ExperimentRun(Base):
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     research_idea_id = Column(String, ForeignKey("research_ideas.id", ondelete="CASCADE"), nullable=False)
-    status = Column(String, nullable=False, default="pending")
+    status = Column(String, nullable=False, default=ExperimentStatus.PENDING)
     log_folder_path = Column(String, nullable=True)
     html_file_path = Column(String, nullable=True)
+    results_url = Column(String, nullable=True)
     started_at = Column(DateTime, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
     is_successful = Column(Boolean, nullable=True)
@@ -57,13 +74,16 @@ class ExperimentResult(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     # Relationships
-    experiment = relationship("ExperimentRun", back_populates="results") 
+    experiment = relationship("ExperimentRun", back_populates="results")
 
-# Pydantic Models for API
+# Base Models
 class ExperimentResultBase(BaseModel):
+    id: str
+    experiment_id: str
     metric_name: str
     metric_value: str
     metric_type: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -72,6 +92,9 @@ class ExperimentRunBase(BaseModel):
     id: str
     research_idea_id: str
     status: str
+    log_folder_path: Optional[str] = None
+    html_file_path: Optional[str] = None
+    results_url: Optional[str] = None
     started_at: datetime
     completed_at: Optional[datetime] = None
     is_successful: Optional[bool] = None
@@ -90,6 +113,9 @@ class ResearchIdeaBase(BaseModel):
     abstract: str
     markdown_file_path: str
     code_file_path: Optional[str] = None
+    status: str
+    ideas_json_url: Optional[str] = None
+    error_message: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     experiments: List[ExperimentRunBase] = []
@@ -115,4 +141,18 @@ class ExperimentRunResponse(ExperimentRunBase):
     pass
 
 class ExperimentResultResponse(ExperimentResultBase):
-    pass 
+    pass
+
+# Status Response Models
+class StatusResponse(BaseModel):
+    status: str
+    error_message: Optional[str] = None
+
+class GenerateIdeasResponse(StatusResponse):
+    idea_id: str
+    ideas_json_url: Optional[str] = None
+
+class RunExperimentResponse(StatusResponse):
+    experiment_id: str
+    idea_id: str
+    started_at: datetime 
