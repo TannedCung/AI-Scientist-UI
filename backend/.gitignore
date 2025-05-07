@@ -56,8 +56,9 @@ coverage.xml
 *.log
 
 # App specific
-app/services/AI-Scientist-v2/
+app/services/AI_Scientist_v2/
 uploads/
 results/
 data/
 logs/ 
+backend/ideas/*
