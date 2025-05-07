@@ -10,7 +10,10 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from ..models.schema import ResearchIdea, ExperimentRun, ExperimentResult, IdeaStatus, ExperimentStatus
+from ..models.schema import (
+    ResearchIdea, ExperimentRun, ExperimentResult, 
+    IdeaStatus, ExperimentStatus, GenerateIdeasResponse
+)
 from .storage import r2_storage
 
 # Import AI Scientist modules
@@ -25,6 +28,8 @@ from .AI_Scientist_v2.ai_scientist.perform_llm_review import perform_review, loa
 from .AI_Scientist_v2.ai_scientist.perform_vlm_review import perform_imgs_cap_ref_review
 from .AI_Scientist_v2.ai_scientist.utils.token_tracker import token_tracker
 
+from .idea_generator import _generate_temp_free_idea
+
 logger = logging.getLogger(__name__)
 
 # Create a thread pool for running long-running tasks
@@ -32,245 +37,157 @@ thread_pool = ThreadPoolExecutor(max_workers=4)
 
 class AIScientistWrapper:
     """Wrapper class for AI Scientist functionality using Python modules directly."""
-    
     def __init__(self):
-        self.base_dir = Path("backend/app/services/AI-Scientist-v2")
-        self.ideas_dir = self.base_dir / "ai_scientist" / "ideas"
-        self.experiments_dir = self.base_dir / "experiments"
-        
-        # Ensure directories exist
+        self.ideas_dir = Path("backend/app/services/AI-Scientist-v2/ai_scientist/ideas")
+        self.experiments_dir = Path("backend/app/services/AI-Scientist-v2/experiments")
         os.makedirs(self.ideas_dir, exist_ok=True)
         os.makedirs(self.experiments_dir, exist_ok=True)
 
-    async def _update_idea_status(self, db: Session, idea_id: str, status: str, error_message: Optional[str] = None):
-        """Update research idea status in database."""
-        research_idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
-        if research_idea:
-            research_idea.status = status
-            if error_message:
-                research_idea.error_message = error_message
-            db.commit()
-
-    async def _update_experiment_status(self, db: Session, experiment_id: str, status: str, error_message: Optional[str] = None):
-        """Update experiment status in database."""
-        experiment = db.query(ExperimentRun).filter(ExperimentRun.id == experiment_id).first()
-        if experiment:
-            experiment.status = status
-            if error_message:
-                experiment.error_message = error_message
-            if status == ExperimentStatus.COMPLETED:
-                experiment.completed_at = datetime.now()
-                experiment.is_successful = True
-            elif status == ExperimentStatus.FAILED:
-                experiment.completed_at = datetime.now()
-                experiment.is_successful = False
-            db.commit()
-
-    async def _generate_ideas_task(self, idea_id: str, db: Session):
-        """Background task for generating ideas."""
+    async def generate_ideas(self, research_idea: ResearchIdea, db: Session) -> GenerateIdeasResponse:
+        """Generate research ideas for a given research idea."""
         try:
             # Update status to generating
-            await self._update_idea_status(db, idea_id, IdeaStatus.GENERATING)
-
-            # Get the research idea from database
-            research_idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
-            if not research_idea:
-                raise Exception("Research idea not found")
-
-            # Get local path for markdown file
-            local_md_path = self.ideas_dir / idea_id / f"{idea_id}.md"
-            if not os.path.exists(local_md_path):
-                os.makedirs(os.path.dirname(local_md_path), exist_ok=True)
-                success = r2_storage.download_file(research_idea.markdown_file_path, str(local_md_path))
-                if not success:
-                    raise Exception("Failed to download markdown file from R2")
+            research_idea.status = IdeaStatus.GENERATING
+            db.commit()
 
             # Create LLM client
             client, model = create_client("gpt-4o-2024-05-13")
 
-            # Run ideation using Python module
-            ideas = generate_temp_free_idea(
-                idea_fname=str(local_md_path.with_suffix('.json')),
+            # Generate ideas using our no-save version
+            ideas = _generate_temp_free_idea(
                 client=client,
                 model=model,
                 workshop_description=research_idea.abstract,
-                max_num_generations=2,
+                max_num_generations=1,
                 num_reflections=3,
-                reload_ideas=True
+                previous_ideas=research_idea.generated_ideas.get("ideas", None) or []
             )
 
-            # Save results
-            output_json_path = local_md_path.with_suffix('.json')
-            with open(output_json_path, 'w') as f:
-                json.dump(ideas, f, indent=2)
+            # Update research idea with generated ideas
+            # Convert the list of dictionaries to a format suitable for JSONB
+            research_idea.generated_ideas = {
+                "ideas": ideas,
+                "metadata": {
+                    "generated_at": datetime.now().isoformat(),
+                    "num_ideas": len(ideas)
+                }
+            }
+            research_idea.status = IdeaStatus.GENERATED
+            db.commit()
 
-            # Upload results to R2
-            json_key = f"ideas/{idea_id}/{idea_id}.json"
-            json_url = await r2_storage.upload_file(str(output_json_path), json_key)
-
-            # Update research idea with results
-            research_idea.ideas_json_url = json_url
-            await self._update_idea_status(db, idea_id, IdeaStatus.GENERATED)
+            return GenerateIdeasResponse(
+                status=research_idea.status,
+                idea_id=research_idea.id,
+                generated_ideas=research_idea.generated_ideas
+            )
 
         except Exception as e:
             logger.error(f"Error generating ideas: {str(e)}")
-            await self._update_idea_status(db, idea_id, IdeaStatus.FAILED, str(e))
-
-    async def _run_experiment_task(self, experiment_id: str, idea_id: str, db: Session):
-        """Background task for running experiments."""
-        try:
-            # Update status to running
-            await self._update_experiment_status(db, experiment_id, ExperimentStatus.RUNNING)
-
-            # Get the research idea from database
-            research_idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
-            if not research_idea:
-                raise Exception("Research idea not found")
-
-            # Get local paths
-            local_json_path = self.ideas_dir / idea_id / f"{idea_id}.json"
-            local_code_path = self.ideas_dir / idea_id / f"{idea_id}.py"
-
-            # Download required files from R2
-            if not os.path.exists(local_json_path):
-                os.makedirs(os.path.dirname(local_json_path), exist_ok=True)
-                json_key = f"ideas/{idea_id}/{idea_id}.json"
-                r2_storage.download_file(json_key, str(local_json_path))
-
-            if research_idea.code_file_path and not os.path.exists(local_code_path):
-                r2_storage.download_file(research_idea.code_file_path, str(local_code_path))
-
-            # Create experiment directory
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            experiment_dir = self.experiments_dir / f"{timestamp}_{idea_id}"
-            os.makedirs(experiment_dir, exist_ok=True)
-
-            # Convert idea to markdown
-            idea_path_md = experiment_dir / "idea.md"
-            idea_to_markdown(
-                json.loads(open(local_json_path).read())[0],  # Get first idea
-                str(idea_path_md),
-                str(local_code_path) if research_idea.code_file_path else None
-            )
-
-            # Edit BFTS config
-            config_path = self.base_dir / "bfts_config.yaml"
-            idea_config_path = edit_bfts_config_file(
-                str(config_path),
-                str(experiment_dir),
-                str(local_json_path)
-            )
-
-            # Run experiments
-            perform_experiments_bfts(idea_config_path)
-
-            # Aggregate plots
-            aggregate_plots(base_folder=str(experiment_dir), model="o3-mini-2025-01-31")
-
-            # Gather citations
-            citations_text = gather_citations(
-                str(experiment_dir),
-                num_cite_rounds=10,
-                small_model="gpt-4o-2024-11-20"
-            )
-
-            # Generate writeup
-            writeup_success = perform_icbinb_writeup(
-                base_folder=str(experiment_dir),
-                big_model="o1-preview-2024-09-12",
-                page_limit=4,
-                citations_text=citations_text
-            )
-
-            if not writeup_success:
-                raise Exception("Failed to generate writeup")
-
-            # Perform review
-            pdf_path = next(experiment_dir.glob("*.pdf"))
-            if pdf_path.exists():
-                paper_content = load_paper(str(pdf_path))
-                client, model = create_client("gpt-4o-2024-11-20")
-                review_text = perform_review(paper_content, model, client)
-                review_img_cap_ref = perform_imgs_cap_ref_review(client, model, str(pdf_path))
-
-                # Save reviews
-                with open(experiment_dir / "review_text.txt", "w") as f:
-                    f.write(json.dumps(review_text, indent=4))
-                with open(experiment_dir / "review_img_cap_ref.json", "w") as f:
-                    json.dump(review_img_cap_ref, f, indent=4)
-
-            # Save token tracker data
-            with open(experiment_dir / "token_tracker.json", "w") as f:
-                json.dump(token_tracker.get_summary(), f)
-            with open(experiment_dir / "token_tracker_interactions.json", "w") as f:
-                json.dump(token_tracker.get_interactions(), f)
-
-            # Upload results to R2
-            r2_key_base = f"experiments/{idea_id}/{experiment_id}"
-            for file_path in experiment_dir.glob("**/*"):
-                if file_path.is_file():
-                    relative_path = file_path.relative_to(experiment_dir)
-                    r2_key = f"{r2_key_base}/{relative_path}"
-                    await r2_storage.upload_file(str(file_path), r2_key)
-
-            # Update experiment status
-            await self._update_experiment_status(db, experiment_id, ExperimentStatus.COMPLETED)
-
-        except Exception as e:
-            logger.error(f"Error running experiment: {str(e)}")
-            await self._update_experiment_status(db, experiment_id, ExperimentStatus.FAILED, str(e))
-
-    async def generate_ideas(self, idea_id: str, db: Session) -> Dict[str, Any]:
-        """Start background task for generating research ideas."""
-        try:
-            # Get the research idea from database
-            research_idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
-            if not research_idea:
-                raise HTTPException(status_code=404, detail="Research idea not found")
-
-            # Start background task
-            asyncio.create_task(self._generate_ideas_task(idea_id, db))
-
-            return {
-                "idea_id": idea_id,
-                "status": IdeaStatus.GENERATING,
-                "message": "Idea generation started in background"
-            }
-
-        except Exception as e:
-            logger.error(f"Error starting idea generation: {str(e)}")
+            research_idea.status = IdeaStatus.FAILED
+            research_idea.error_message = str(e)
+            db.commit()
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def run_experiment(self, idea_id: str, db: Session) -> Dict[str, Any]:
-        """Start background task for running an experiment."""
+    async def run_experiment(self, idea_id: str, db: Session) -> ExperimentRun:
+        """Run an experiment for a given research idea."""
         try:
-            # Get the research idea from database
+            # Get the research idea
             research_idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
             if not research_idea:
                 raise HTTPException(status_code=404, detail="Research idea not found")
 
-            # Create experiment run record
+            # Create experiment run
             experiment_run = ExperimentRun(
                 research_idea_id=idea_id,
-                status=ExperimentStatus.PENDING
+                status=ExperimentStatus.RUNNING
             )
             db.add(experiment_run)
             db.commit()
             db.refresh(experiment_run)
 
-            # Start background task
-            asyncio.create_task(self._run_experiment_task(experiment_run.id, idea_id, db))
+            # Create experiment directory
+            experiment_dir = self.experiments_dir / experiment_run.id
+            os.makedirs(experiment_dir, exist_ok=True)
+
+            try:
+                # Run experiment using the AI model
+                results = await self._run_experiment_task(
+                    research_idea=research_idea,
+                    experiment_run=experiment_run,
+                    experiment_dir=experiment_dir,
+                    db=db
+                )
+
+                # Update experiment run with results
+                experiment_run.status = ExperimentStatus.COMPLETED
+                experiment_run.is_successful = True
+                experiment_run.completed_at = datetime.now()
+                experiment_run.results_url = results.get("results_url")
+                db.commit()
+
+                return experiment_run
+
+            except Exception as e:
+                logger.error(f"Error running experiment: {str(e)}")
+                experiment_run.status = ExperimentStatus.FAILED
+                experiment_run.is_successful = False
+                experiment_run.error_message = str(e)
+                experiment_run.completed_at = datetime.now()
+                db.commit()
+                raise
+
+        except Exception as e:
+            logger.error(f"Error setting up experiment: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def _run_experiment_task(
+        self,
+        research_idea: ResearchIdea,
+        experiment_run: ExperimentRun,
+        experiment_dir: Path,
+        db: Session
+    ) -> Dict[str, Any]:
+        """Run the actual experiment task."""
+        try:
+            # Create experiment configuration
+            config = {
+                "idea_id": research_idea.id,
+                "experiment_id": experiment_run.id,
+                "title": research_idea.title,
+                "abstract": research_idea.abstract,
+                "generated_ideas": research_idea.generated_ideas
+            }
+
+            # Save experiment configuration
+            config_path = experiment_dir / "config.json"
+            with open(config_path, "w") as f:
+                json.dump(config, f, indent=2)
+
+            # Run experiment using AI Scientist modules
+            results = await perform_experiments_bfts(
+                config_path=str(config_path),
+                output_dir=str(experiment_dir),
+                client=None,  # Will be created inside the function
+                model="gpt-4o-2024-05-13"
+            )
+
+            # Save results
+            results_path = experiment_dir / "results.json"
+            with open(results_path, "w") as f:
+                json.dump(results, f, indent=2)
+
+            # Upload results to storage
+            results_key = f"experiments/{research_idea.id}/{experiment_run.id}/results.json"
+            results_url = await r2_storage.upload_file(str(results_path), results_key)
 
             return {
-                "experiment_id": experiment_run.id,
-                "idea_id": idea_id,
-                "status": ExperimentStatus.PENDING,
-                "message": "Experiment started in background"
+                "results_url": results_url,
+                "results": results
             }
 
         except Exception as e:
-            logger.error(f"Error starting experiment: {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.error(f"Error in experiment task: {str(e)}")
+            raise
 
 # Create singleton instance
 ai_scientist = AIScientistWrapper() 
