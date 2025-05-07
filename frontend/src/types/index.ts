@@ -5,9 +5,13 @@ export interface ResearchIdea {
   tldr: string;
   abstract: string;
   markdown_file_path: string;
-  code_file_path: string;
+  code_file_path: string | null;
+  status: string;
+  ideas_json_url: string | null;
+  error_message: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
+  experiments: ExperimentRun[];
 }
 
 export interface CreateResearchIdeaResponse {
@@ -16,12 +20,15 @@ export interface CreateResearchIdeaResponse {
   markdown_url: string;
   code_url: string;
   created_at: string;
+  status: string;
+  error_message: string | null;
 }
 
 export interface GenerateIdeasResponse {
   idea_id: string;
   status: string;
-  ideas_json_url: string;
+  error_message: string | null;
+  ideas_json_url: string | null;
 }
 
 export interface ExperimentRun {
@@ -30,16 +37,29 @@ export interface ExperimentRun {
   status: string;
   log_folder_path: string | null;
   html_file_path: string | null;
+  results_url: string | null;
   started_at: string;
   completed_at: string | null;
   is_successful: boolean | null;
-  html_url?: string;
+  error_message: string | null;
+  experiment_config: any | null;
+  results: ExperimentResult[];
+}
+
+export interface ExperimentResult {
+  id: string;
+  experiment_id: string;
+  metric_name: string;
+  metric_value: string;
+  metric_type: string;
+  created_at: string;
 }
 
 export interface CreateExperimentResponse {
   experiment_id: string;
   idea_id: string;
   status: string;
+  error_message: string | null;
   started_at: string;
 }
 
@@ -47,8 +67,9 @@ export interface ExperimentStatusResponse {
   experiment_id: string;
   idea_id: string;
   status: string;
+  error_message: string | null;
   started_at: string;
   completed_at: string | null;
   is_successful: boolean | null;
-  html_url?: string;
+  results_url: string | null;
 } 

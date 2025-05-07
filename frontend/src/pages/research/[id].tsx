@@ -170,121 +170,126 @@ export default function ResearchIdeaDetail() {
             {success}
           </Alert>
         )}
-        
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={8}>
-            <Card>
-              <CardContent>
-                <Typography variant="h5" gutterBottom>
-                  {idea.title}
-                </Typography>
-                <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-                  Keywords: {idea.keywords}
-                </Typography>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle1" gutterBottom>
-                  TL;DR
-                </Typography>
-                <Typography variant="body1" paragraph>
-                  {idea.tldr}
-                </Typography>
-                <Typography variant="subtitle1" gutterBottom>
-                  Abstract
-                </Typography>
-                <Typography variant="body1">
-                  {idea.abstract}
-                </Typography>
-              </CardContent>
-              <CardActions sx={{ justifyContent: 'flex-end', p: 2 }}>
-                <Button 
-                  variant="contained"
-                  startIcon={<PlayArrowIcon />}
-                  onClick={handleRunExperiment}
-                  disabled={runningExperiment}
-                >
-                  {runningExperiment ? <CircularProgress size={24} /> : 'Run Experiment'}
-                </Button>
-              </CardActions>
-            </Card>
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Files
-                </Typography>
-                <Button 
-                  startIcon={<CloudDownloadIcon />}
-                  variant="outlined"
-                  fullWidth
-                  sx={{ mb: 1 }}
-                  component="a"
-                  href={idea.markdown_file_path}
-                  target="_blank"
-                >
-                  Markdown File
-                </Button>
-                <Button 
-                  startIcon={<CloudDownloadIcon />}
-                  variant="outlined"
-                  fullWidth
-                  component="a"
-                  href={idea.code_file_path}
-                  target="_blank"
-                >
-                  Code File
-                </Button>
-              </CardContent>
-            </Card>
-            
-            <Card sx={{ mt: 3 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Related Experiments
-                </Typography>
-                {experiments.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    No experiments have been run for this research idea yet.
+
+        {idea && (
+          <>
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <Typography variant="h5" gutterBottom>
+                    {idea.title}
                   </Typography>
-                ) : (
-                  experiments.map((experiment) => (
-                    <Box 
-                      key={experiment.id} 
-                      sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                    >
-                      <Box>
-                        <Typography variant="body2">
-                          {experiment.id.substring(0, 8)}...
-                        </Typography>
-                        <Chip 
-                          label={experiment.status} 
-                          color={getStatusColor(experiment.status) as any} 
-                          size="small" 
-                        />
-                      </Box>
-                      <Link href={`/experiments/${experiment.id}`} passHref>
-                        <Button size="small" variant="outlined">
-                          View
-                        </Button>
-                      </Link>
-                    </Box>
-                  ))
-                )}
-              </CardContent>
-              <CardActions>
-                <Link href="/experiments" passHref style={{ width: '100%' }}>
-                  <Button 
-                    fullWidth
-                    startIcon={<ScienceIcon />}
-                  >
-                    View All Experiments
-                  </Button>
-                </Link>
-              </CardActions>
-            </Card>
-          </Grid>
-        </Grid>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                    <Chip 
+                      label={idea.status.toUpperCase()} 
+                      color={getStatusColor(idea.status)}
+                      size="small"
+                    />
+                    {idea.error_message && (
+                      <Chip 
+                        label="Error" 
+                        color="error"
+                        size="small"
+                        onClick={() => setError(idea.error_message)}
+                      />
+                    )}
+                  </Box>
+                  <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+                    Keywords: {idea.keywords}
+                  </Typography>
+                  <Typography variant="body1" paragraph>
+                    <strong>TL;DR:</strong> {idea.tldr}
+                  </Typography>
+                  <Typography variant="body1" paragraph>
+                    <strong>Abstract:</strong> {idea.abstract}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Created: {formatDate(idea.created_at)}
+                  </Typography>
+                  {idea.updated_at && (
+                    <Typography variant="body2" color="text.secondary">
+                      Last Updated: {formatDate(idea.updated_at)}
+                    </Typography>
+                  )}
+                </Grid>
+              </Grid>
+            </Paper>
+
+            <Box sx={{ mb: 3 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<ScienceIcon />}
+                onClick={handleRunExperiment}
+                disabled={runningExperiment || idea.status === 'generating'}
+                sx={{ mr: 2 }}
+              >
+                {runningExperiment ? 'Starting Experiment...' : 'Run Experiment'}
+              </Button>
+              {idea.ideas_json_url && (
+                <Button
+                  variant="outlined"
+                  startIcon={<CloudDownloadIcon />}
+                  href={idea.ideas_json_url}
+                  target="_blank"
+                  sx={{ mr: 2 }}
+                >
+                  Download Ideas
+                </Button>
+              )}
+            </Box>
+
+            {experiments.length > 0 && (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Experiments
+                </Typography>
+                <Grid container spacing={2}>
+                  {experiments.map((experiment) => (
+                    <Grid item xs={12} key={experiment.id}>
+                      <Card>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="h6">
+                              Experiment {experiment.id}
+                            </Typography>
+                            <Chip 
+                              label={experiment.status.toUpperCase()} 
+                              color={getStatusColor(experiment.status)}
+                              size="small"
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            Started: {formatDate(experiment.started_at)}
+                          </Typography>
+                          {experiment.completed_at && (
+                            <Typography variant="body2" color="text.secondary">
+                              Completed: {formatDate(experiment.completed_at)}
+                            </Typography>
+                          )}
+                          {experiment.error_message && (
+                            <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                              Error: {experiment.error_message}
+                            </Typography>
+                          )}
+                        </CardContent>
+                        <CardActions>
+                          <Button
+                            size="small"
+                            component={Link}
+                            href={`/experiments/${experiment.id}`}
+                          >
+                            View Details
+                          </Button>
+                        </CardActions>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </>
+            )}
+          </>
+        )}
       </Box>
     </Container>
   );
