@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Inte
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB
 import uuid
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -31,10 +32,9 @@ class ResearchIdea(Base):
     keywords = Column(String, nullable=False)
     tldr = Column(String, nullable=False)
     abstract = Column(Text, nullable=False)
-    markdown_file_path = Column(String, nullable=False)
     code_file_path = Column(String, nullable=True)
     status = Column(String, nullable=False, default=IdeaStatus.DRAFT)
-    ideas_json_url = Column(String, nullable=True)
+    generated_ideas = Column(JSONB, nullable=True, default=lambda: {"ideas": [], "metadata": {"generated_at": None, "num_ideas": 0}})
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -111,10 +111,9 @@ class ResearchIdeaBase(BaseModel):
     keywords: str
     tldr: str
     abstract: str
-    markdown_file_path: str
     code_file_path: Optional[str] = None
     status: str
-    ideas_json_url: Optional[str] = None
+    generated_ideas: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -150,7 +149,7 @@ class StatusResponse(BaseModel):
 
 class GenerateIdeasResponse(StatusResponse):
     idea_id: str
-    ideas_json_url: Optional[str] = None
+    generated_ideas: Dict[str, Any] = {}
 
 class RunExperimentResponse(StatusResponse):
     experiment_id: str
