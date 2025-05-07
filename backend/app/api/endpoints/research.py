@@ -1,92 +1,189 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Optional
+import uuid
+import os
+import logging
+from datetime import datetime
 
 from ...db.database import get_db
-from ...models.research_idea import ResearchIdea, ExperimentRun
-from ...services.ai_scientist import AIScientistService
+from ...models.schema import (
+    ResearchIdea, ExperimentRun, ExperimentResult,
+    ResearchIdeaResponse, ExperimentRunResponse,
+    ResearchIdeaCreate
+)
+from ...services.storage import r2_storage
+from ...services.ai_scientist_wrapper import ai_scientist
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/ideas", summary="Create a new research idea")
+@router.post("/ideas", response_model=ResearchIdeaResponse)
 async def create_research_idea(
     title: str = Form(...),
     keywords: str = Form(...),
     tldr: str = Form(...),
     abstract: str = Form(...),
-    code_file: UploadFile = File(...),
+    code_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Create a new research idea with the provided details and upload code file.
-    
-    - **title**: Title of the research idea
-    - **keywords**: Keywords related to the research idea (comma-separated)
-    - **tldr**: Short summary of the research idea
-    - **abstract**: Detailed abstract of the research idea
-    - **code_file**: Code file to be used for experimentation
-    """
-    return await AIScientistService.create_research_idea(
-        title=title,
-        keywords=keywords,
-        tldr=tldr,
-        abstract=abstract,
-        code_file=code_file,
-        db=db
-    )
+    """Create a new research idea and generate initial hypotheses."""
+    try:
+        logger.info(f"Creating new research idea: {title}")
+        
+        # Generate unique ID for the research idea
+        idea_id = str(uuid.uuid4())
+        
+        # Create directory structure
+        idea_dir = f"ideas/{idea_id}"
+        os.makedirs(idea_dir, exist_ok=True)
+        
+        # Create markdown file content
+        markdown_content = f"""# {title}
 
-@router.get("/ideas", summary="Get all research ideas")
-async def get_research_ideas(db: Session = Depends(get_db)):
-    """
-    Retrieve all research ideas from the database.
-    """
-    ideas = db.query(ResearchIdea).all()
-    return ideas
+## Keywords
+{keywords}
 
-@router.get("/ideas/{idea_id}", summary="Get a specific research idea")
+## TL;DR
+{tldr}
+
+## Abstract
+{abstract}
+"""
+        
+        # Save markdown file locally
+        markdown_path = f"{idea_dir}/{idea_id}.md"
+        with open(markdown_path, "w") as f:
+            f.write(markdown_content)
+        
+        # Upload markdown file to R2
+        markdown_key = f"{idea_dir}/{idea_id}.md"
+        markdown_url = await r2_storage.upload_file(markdown_path, markdown_key)
+        logger.info(f"Uploaded markdown file to R2: {markdown_key}")
+        
+        # Handle code file if provided
+        code_file_path = None
+        if code_file:
+            logger.info(f"Processing code file: {code_file.filename}")
+            code_path = f"{idea_dir}/{idea_id}.py"
+            with open(code_path, "wb") as f:
+                content = await code_file.read()
+                f.write(content)
+            
+            code_key = f"{idea_dir}/{idea_id}.py"
+            code_url = await r2_storage.upload_file(code_path, code_key)
+            code_file_path = code_key
+            logger.info(f"Uploaded code file to R2: {code_key}")
+        
+        # Create research idea in database
+        research_idea = ResearchIdea(
+            id=idea_id,
+            title=title,
+            keywords=keywords,
+            tldr=tldr,
+            abstract=abstract,
+            markdown_file_path=markdown_key,
+            code_file_path=code_file_path,
+            created_at=datetime.now()
+        )
+        db.add(research_idea)
+        db.commit()
+        db.refresh(research_idea)
+        logger.info(f"Created research idea in database: {idea_id}")
+        
+        # Generate initial hypotheses using AI Scientist
+        try:
+            logger.info(f"Generating initial hypotheses for idea: {idea_id}")
+            await ai_scientist.generate_ideas(idea_id, db)
+            logger.info(f"Successfully generated hypotheses for idea: {idea_id}")
+        except Exception as e:
+            logger.error(f"Failed to generate initial hypotheses for idea {idea_id}: {str(e)}")
+            # Don't fail the creation if hypothesis generation fails
+        
+        return research_idea
+        
+    except Exception as e:
+        logger.error(f"Error creating research idea: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/ideas", response_model=List[ResearchIdeaResponse])
+async def get_all_research_ideas(db: Session = Depends(get_db)):
+    """Get all research ideas."""
+    try:
+        logger.info("Fetching all research ideas")
+        ideas = db.query(ResearchIdea).all()
+        logger.info(f"Found {len(ideas)} research ideas")
+        return ideas
+    except Exception as e:
+        logger.error(f"Error fetching research ideas: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/ideas/{idea_id}", response_model=ResearchIdeaResponse)
 async def get_research_idea(idea_id: str, db: Session = Depends(get_db)):
-    """
-    Retrieve a specific research idea by its ID.
-    """
-    idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
-    if not idea:
-        raise HTTPException(status_code=404, detail="Research idea not found")
-    return idea
+    """Get a specific research idea."""
+    try:
+        logger.info(f"Fetching research idea: {idea_id}")
+        research_idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
+        if not research_idea:
+            logger.warning(f"Research idea not found: {idea_id}")
+            raise HTTPException(status_code=404, detail="Research idea not found")
+        return research_idea
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching research idea {idea_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/ideas/{idea_id}/generate", summary="Generate research hypotheses")
-async def generate_ideas(idea_id: str, db: Session = Depends(get_db)):
-    """
-    Generate research hypotheses for a given research idea.
-    
-    The AI Scientist will analyze the provided idea and generate potential
-    research directions based on the title, keywords, TL;DR, and abstract.
-    """
-    return await AIScientistService.generate_ideas(idea_id=idea_id, db=db)
+@router.post("/ideas/{idea_id}/generate", response_model=dict)
+async def generate_research_hypotheses(idea_id: str, db: Session = Depends(get_db)):
+    """Generate research hypotheses for a specific idea."""
+    try:
+        logger.info(f"Generating hypotheses for idea: {idea_id}")
+        result = await ai_scientist.generate_ideas(idea_id, db)
+        logger.info(f"Successfully generated hypotheses for idea: {idea_id}")
+        return result
+    except Exception as e:
+        logger.error(f"Error generating hypotheses for idea {idea_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/ideas/{idea_id}/experiments", summary="Run an experiment")
+@router.post("/ideas/{idea_id}/experiments", response_model=ExperimentRunResponse)
 async def run_experiment(idea_id: str, db: Session = Depends(get_db)):
-    """
-    Start a new experiment run for the given research idea.
-    
-    The AI Scientist will execute experiments based on the generated ideas,
-    analyze results, and produce a scientific paper.
-    """
-    return await AIScientistService.run_experiment(idea_id=idea_id, db=db)
+    """Run an experiment for a specific research idea."""
+    try:
+        logger.info(f"Starting experiment for idea: {idea_id}")
+        result = await ai_scientist.run_experiment(idea_id, db)
+        logger.info(f"Successfully completed experiment for idea: {idea_id}")
+        return result
+    except Exception as e:
+        logger.error(f"Error running experiment for idea {idea_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/experiments", summary="Get all experiments")
-async def get_experiments(db: Session = Depends(get_db)):
-    """
-    Retrieve all experiment runs from the database.
-    """
-    experiments = db.query(ExperimentRun).all()
-    return experiments
+@router.get("/experiments", response_model=List[ExperimentRunResponse])
+async def get_all_experiments(db: Session = Depends(get_db)):
+    """Get all experiment runs."""
+    try:
+        logger.info("Fetching all experiments")
+        experiments = db.query(ExperimentRun).all()
+        logger.info(f"Found {len(experiments)} experiments")
+        return experiments
+    except Exception as e:
+        logger.error(f"Error fetching experiments: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/experiments/{experiment_id}", summary="Get experiment status")
+@router.get("/experiments/{experiment_id}", response_model=ExperimentRunResponse)
 async def get_experiment_status(experiment_id: str, db: Session = Depends(get_db)):
-    """
-    Get the status of a specific experiment run.
-    
-    This endpoint can be polled to check if an experiment has been completed
-    and to retrieve the URL of the resulting HTML visualization.
-    """
-    return AIScientistService.get_experiment_status(experiment_id=experiment_id, db=db) 
+    """Get the status of a specific experiment."""
+    try:
+        logger.info(f"Fetching experiment status: {experiment_id}")
+        experiment = db.query(ExperimentRun).filter(ExperimentRun.id == experiment_id).first()
+        if not experiment:
+            logger.warning(f"Experiment not found: {experiment_id}")
+            raise HTTPException(status_code=404, detail="Experiment not found")
+        return experiment
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching experiment {experiment_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) 

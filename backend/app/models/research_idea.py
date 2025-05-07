@@ -14,7 +14,7 @@ class ResearchIdea(Base):
     tldr = Column(String, nullable=False)
     abstract = Column(Text, nullable=False)
     markdown_file_path = Column(String, nullable=False)
-    code_file_path = Column(String, nullable=False)
+    code_file_path = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

@@ -28,7 +28,7 @@ class AIScientistService:
         keywords: str,
         tldr: str, 
         abstract: str,
-        code_file: UploadFile,
+        code_file: Optional[UploadFile],
         db: Session
     ) -> Dict[str, Any]:
         """
@@ -51,18 +51,23 @@ class AIScientistService:
         with open(md_file_path, 'w') as f:
             f.write(md_content)
         
-        # Save code file
-        code_file_path = idea_dir / f"{idea_id}.py"  # Assuming Python code
-        content = await code_file.read()
-        with open(code_file_path, 'wb') as f:
-            f.write(content)
-        
-        # Upload files to R2
+        # Upload markdown file to R2
         md_file_key = f"ideas/{idea_id}/{idea_id}.md"
-        code_file_key = f"ideas/{idea_id}/{idea_id}.py"
-        
         md_url = await r2_storage.upload_file(str(md_file_path), md_file_key)
-        code_url = await r2_storage.upload_file(str(code_file_path), code_file_key)
+        
+        # Handle code file if provided
+        code_url = None
+        code_file_key = None
+        if code_file:
+            # Save code file
+            code_file_path = idea_dir / f"{idea_id}.py"  # Assuming Python code
+            content = await code_file.read()
+            with open(code_file_path, 'wb') as f:
+                f.write(content)
+            
+            # Upload code file to R2
+            code_file_key = f"ideas/{idea_id}/{idea_id}.py"
+            code_url = await r2_storage.upload_file(str(code_file_path), code_file_key)
         
         # Create research idea in database
         research_idea = ResearchIdea(
@@ -111,7 +116,7 @@ class AIScientistService:
             f"{AI_SCIENTIST_DIR}/ai_scientist/perform_ideation_temp_free.py",
             "--workshop-file", str(local_md_path),
             "--model", "gpt-4o-2024-05-13",
-            "--max-num-generations", "10",
+            "--max-num-generations", "2",
             "--num-reflections", "3"
         ]
         

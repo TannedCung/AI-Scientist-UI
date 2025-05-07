@@ -99,3 +99,6 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk 
+
+backend/backend/app/services/AI-Scientist-v2/ai_scientist/ideas/*
+backend/ideas/65ffc4d9-091f-4911-84c4-a2e4e0618984/65ffc4d9-091f-4911-84c4-a2e4e0618984.md
