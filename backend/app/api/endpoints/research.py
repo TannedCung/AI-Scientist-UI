@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 import os
 import logging
@@ -10,13 +10,15 @@ from ...db.database import get_db
 from ...models.schema import (
     GenerateIdeasResponse, ResearchIdea, ExperimentRun, ExperimentResult,
     ResearchIdeaResponse, ExperimentRunResponse, ResearchIdeaCreate,
-    IdeaStatus
+    IdeaStatus, ExperimentStatus, StatusResponse, RunExperimentResponse
 )
 from ...services.storage import r2_storage
 from ...services.ai_scientist_wrapper import ai_scientist, AIScientistWrapper
+from ...services.background_tasks import task_manager
+from ...core.logging import get_logger
 
 # Configure logging
-logger = logging.getLogger(__name__)
+logger = get_logger("research_api")
 
 router = APIRouter()
 
@@ -39,13 +41,44 @@ async def create_research_idea(
         # Generate unique ID for the research idea
         idea_id = str(uuid.uuid4())
         
+        # Create directory structure
+        idea_dir = f"ideas/{idea_id}"
+        os.makedirs(idea_dir, exist_ok=True)
+        
+        # Create markdown file content
+        markdown_content = f"""# {title}
+
+## Keywords
+{keywords}
+
+## TL;DR
+{tldr}
+
+## Abstract
+{abstract}
+"""
+        
+        # Save markdown file locally
+        markdown_path = f"{idea_dir}/{idea_id}.md"
+        with open(markdown_path, "w") as f:
+            f.write(markdown_content)
+        
+        # Upload markdown file to R2
+        markdown_key = f"{idea_dir}/{idea_id}.md"
+        markdown_url = await r2_storage.upload_file(markdown_path, markdown_key)
+        logger.info(f"Uploaded markdown file to R2: {markdown_key}")
+        
         # Handle code file if provided
         code_file_path = None
         if code_file:
             logger.info(f"Processing code file: {code_file.filename}")
-            code_key = f"ideas/{idea_id}/{idea_id}.py"
-            content = await code_file.read()
-            await r2_storage.upload_bytes(content, code_key)
+            code_path = f"{idea_dir}/{idea_id}.py"
+            with open(code_path, "wb") as f:
+                content = await code_file.read()
+                f.write(content)
+            
+            code_key = f"{idea_dir}/{idea_id}.py"
+            code_url = await r2_storage.upload_file(code_path, code_key)
             code_file_path = code_key
             logger.info(f"Uploaded code file to R2: {code_key}")
         
@@ -57,21 +90,13 @@ async def create_research_idea(
             tldr=tldr,
             abstract=abstract,
             code_file_path=code_file_path,
-            status=IdeaStatus.DRAFT
+            status=IdeaStatus.DRAFT,
+            created_at=datetime.now()
         )
         db.add(research_idea)
         db.commit()
         db.refresh(research_idea)
         logger.info(f"Created research idea in database: {idea_id}")
-        
-        # Generate initial hypotheses using AI Scientist
-        try:
-            logger.info(f"Generating initial hypotheses for idea: {idea_id}")
-            await ai_scientist.generate_ideas(research_idea, db)
-            logger.info(f"Successfully generated hypotheses for idea: {idea_id}")
-        except Exception as e:
-            logger.error(f"Failed to generate initial hypotheses for idea {idea_id}: {str(e)}")
-            # Don't fail the creation if hypothesis generation fails
         
         return research_idea
         
@@ -108,38 +133,35 @@ async def get_research_idea(idea_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/ideas/{idea_id}/generate", response_model=GenerateIdeasResponse)
-async def generate_ideas(
-    idea_id: str,
-    db: Session = Depends(get_db),
-    ai_scientist_service: AIScientistWrapper = Depends(get_ai_scientist)
-):
-    """Generate research ideas for a specific research idea."""
+async def generate_research_hypotheses(idea_id: str, db: Session = Depends(get_db)):
+    """Generate research hypotheses for a specific idea as a background task."""
     try:
-        # Get the research idea
-        research_idea = db.query(ResearchIdea).filter(ResearchIdea.id == idea_id).first()
-        if not research_idea:
-            raise HTTPException(status_code=404, detail="Research idea not found")
-
-        # Generate ideas
-        response = await ai_scientist_service.generate_ideas(research_idea, db)
-        return response
-
+        logger.info(f"Starting hypothesis generation for idea: {idea_id}")
+        result = await ai_scientist.generate_ideas(idea_id, db)
+        logger.info(f"Successfully queued hypothesis generation for idea: {idea_id}")
+        return GenerateIdeasResponse(
+            status="generating",
+            idea_id=idea_id,
+            task_id=result.get("task_id")
+        )
     except Exception as e:
-        logger.error(f"Error generating ideas: {str(e)}")
+        logger.error(f"Error generating hypotheses for idea {idea_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/ideas/{idea_id}/experiments", response_model=ExperimentRunResponse)
-async def run_experiment(
-    idea_id: str,
-    db: Session = Depends(get_db),
-    ai_scientist_service: AIScientistWrapper = Depends(get_ai_scientist)
-):
-    """Run an experiment for a specific research idea."""
+@router.post("/ideas/{idea_id}/experiments", response_model=RunExperimentResponse)
+async def run_experiment(idea_id: str, db: Session = Depends(get_db)):
+    """Run an experiment for a specific research idea as a background task."""
     try:
         logger.info(f"Starting experiment for idea: {idea_id}")
-        result = await ai_scientist_service.run_experiment(idea_id, db)
-        logger.info(f"Successfully completed experiment for idea: {idea_id}")
-        return result
+        result = await ai_scientist.run_experiment(idea_id, db)
+        logger.info(f"Successfully queued experiment for idea: {idea_id}")
+        return RunExperimentResponse(
+            status="pending",
+            experiment_id=result.get("experiment_id"),
+            idea_id=idea_id,
+            task_id=result.get("task_id"),
+            started_at=result.get("started_at")
+        )
     except Exception as e:
         logger.error(f"Error running experiment for idea {idea_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -170,4 +192,37 @@ async def get_experiment_status(experiment_id: str, db: Session = Depends(get_db
         raise
     except Exception as e:
         logger.error(f"Error fetching experiment {experiment_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/tasks/{task_id}", response_model=Dict[str, Any])
+async def get_task_status(task_id: str):
+    """Get the status of a background task."""
+    try:
+        logger.info(f"Fetching task status: {task_id}")
+        status = await ai_scientist.get_task_status(task_id)
+        logger.info(f"Task {task_id} status: {status.get('status')}")
+        return status
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching task {task_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/tasks/{task_id}/cancel", response_model=StatusResponse)
+async def cancel_task(task_id: str):
+    """Cancel a background task if it's still pending."""
+    try:
+        logger.info(f"Cancelling task: {task_id}")
+        result = task_manager.cancel_task(task_id)
+        if result:
+            logger.info(f"Successfully cancelled task: {task_id}")
+            return StatusResponse(status="cancelled")
+        else:
+            logger.warning(f"Task {task_id} could not be cancelled (already running or completed)")
+            return StatusResponse(status="not_cancelled", error_message="Task already running or completed")
+    except ValueError as e:
+        logger.error(f"Error cancelling task {task_id}: {str(e)}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error cancelling task {task_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 
