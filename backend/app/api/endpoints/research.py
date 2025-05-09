@@ -45,29 +45,6 @@ async def create_research_idea(
         idea_dir = f"ideas/{idea_id}"
         os.makedirs(idea_dir, exist_ok=True)
         
-        # Create markdown file content
-        markdown_content = f"""# {title}
-
-## Keywords
-{keywords}
-
-## TL;DR
-{tldr}
-
-## Abstract
-{abstract}
-"""
-        
-        # Save markdown file locally
-        markdown_path = f"{idea_dir}/{idea_id}.md"
-        with open(markdown_path, "w") as f:
-            f.write(markdown_content)
-        
-        # Upload markdown file to R2
-        markdown_key = f"{idea_dir}/{idea_id}.md"
-        markdown_url = await r2_storage.upload_file(markdown_path, markdown_key)
-        logger.info(f"Uploaded markdown file to R2: {markdown_key}")
-        
         # Handle code file if provided
         code_file_path = None
         if code_file:
