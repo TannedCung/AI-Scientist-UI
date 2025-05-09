@@ -28,6 +28,8 @@ from .AI_Scientist_v2.ai_scientist.perform_llm_review import perform_review, loa
 from .AI_Scientist_v2.ai_scientist.perform_vlm_review import perform_imgs_cap_ref_review
 from .AI_Scientist_v2.ai_scientist.utils.token_tracker import token_tracker
 
+from .idea_generator import _generate_temp_free_idea
+
 logger = get_logger("ai_scientist_wrapper")
 
 class AIScientistWrapper:
@@ -99,30 +101,17 @@ class AIScientistWrapper:
 
             logger.info(f"Generating ideas for {idea_id}: {research_idea.title}")
             
-            # Create directory for idea
-            idea_dir = self.ideas_dir / idea_id
-            os.makedirs(idea_dir, exist_ok=True)
-            
-            # Create markdown file
-            md_path = idea_dir / f"{idea_id}.md"
-            with open(md_path, "w") as f:
-                f.write(f"# {research_idea.title}\n\n")
-                f.write(f"## Keywords\n{research_idea.keywords}\n\n")
-                f.write(f"## TL;DR\n{research_idea.tldr}\n\n")
-                f.write(f"## Abstract\n{research_idea.abstract}\n")
-            
             # Create LLM client
             client, model = create_client(settings_service.get_settings().agent.code.model)
             
             # Generate ideas
-            ideas = generate_temp_free_idea(
-                idea_fname=str(md_path.with_suffix('.json')),
+            ideas = _generate_temp_free_idea(
                 client=client,
                 model=model,
                 workshop_description=research_idea.abstract,
-                max_num_generations=5,
+                max_num_generations=1,
                 num_reflections=3,
-                reload_ideas=True
+                previous_ideas=research_idea.generated_ideas.get("ideas", [])
             )
             
             # Save results to database
@@ -238,9 +227,6 @@ class AIScientistWrapper:
             idea_dir = self.ideas_dir / idea_id
             idea_json_path = idea_dir / f"{idea_id}.json"
             
-            if not idea_json_path.exists():
-                raise Exception("Idea JSON file not found. Generate ideas first.")
-            
             # Get code file if available
             code_path = None
             if research_idea.code_file_path:
@@ -257,23 +243,20 @@ class AIScientistWrapper:
             db.commit()
             
             # Convert idea to markdown for the experiment
-            ideas = json.loads(idea_json_path.read_text())
-            idea_md_path = experiment_dir / "idea.md"
+            ideas = research_idea.generated_ideas.get("ideas", [])
             
             if not ideas:
-                raise Exception("No ideas found in JSON file")
-                
-            idea_to_markdown(
-                ideas[0],  # Use the first idea
-                str(idea_md_path),
-                str(code_path) if code_path and code_path.exists() else None
-            )
+                raise Exception("No ideas found. Generate ideas first")
+            # TODO: Add Function: run_experiment for the idea number
+            # Create ideas JSON file from ideas
+            with open(idea_json_path, "w") as f:
+                json.dump(ideas[0], f, indent=4)
             
             # Get settings
             settings = settings_service.get_settings()
             
             # Create experiment config
-            config_path = self.base_dir / "bfts_config.yaml"
+            config_path = settings_service.config_path
             idea_config_path = edit_bfts_config_file(
                 str(config_path),
                 str(experiment_dir),
