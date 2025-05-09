@@ -49,8 +49,8 @@ services:
       - EXECUTION_TIMEOUT=${EXECUTION_TIMEOUT}
     volumes:
       - ./backend:/app
-    ports:
-      - "8001:8000"
+    expose:
+      - "8000"
     networks:
       - ai-scientist-network
 
@@ -60,13 +60,27 @@ services:
       dockerfile: Dockerfile
     container_name: ai-scientist-frontend
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_API_URL=http://nginx/api
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
     ports:
-      - "3001:3000"
+      - "3010:3000"
+    depends_on:
+      - backend
+      - nginx
+    networks:
+      - ai-scientist-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: ai-scientist-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d:/etc/nginx/conf.d
     depends_on:
       - backend
     networks:
