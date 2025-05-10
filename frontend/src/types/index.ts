@@ -4,10 +4,9 @@ export interface ResearchIdea {
   keywords: string;
   tldr: string;
   abstract: string;
-  markdown_file_path: string;
   code_file_path: string | null;
   status: string;
-  ideas_json_url: string | null;
+  generated_ideas: any | null;
   error_message: string | null;
   created_at: string;
   updated_at: string | null;
@@ -28,7 +27,7 @@ export interface GenerateIdeasResponse {
   idea_id: string;
   status: string;
   error_message: string | null;
-  ideas_json_url: string | null;
+  generated_ideas: any | null;
 }
 
 export interface ExperimentRun {
@@ -72,4 +71,18 @@ export interface ExperimentStatusResponse {
   completed_at: string | null;
   is_successful: boolean | null;
   results_url: string | null;
+}
+
+export enum IdeaStatus {
+  DRAFT = "draft",
+  GENERATING = "generating",
+  GENERATED = "generated",
+  FAILED = "failed"
+}
+
+export enum ExperimentStatus {
+  PENDING = "pending",
+  RUNNING = "running",
+  COMPLETED = "completed",
+  FAILED = "failed"
 } 
