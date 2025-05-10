@@ -15,7 +15,8 @@ import {
   Typography,
   useMediaQuery,
   Avatar,
-  Tooltip
+  Tooltip,
+  CircularProgress
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -27,7 +28,7 @@ import GitHubIcon from '@mui/icons-material/GitHub';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
-const drawerWidth = 240;
+const drawerWidth = 280;
 
 interface NavItem {
   text: string;
@@ -63,6 +64,23 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Handle route change events
+  React.useEffect(() => {
+    const handleStart = () => setIsLoading(true);
+    const handleComplete = () => setIsLoading(false);
+
+    router.events.on('routeChangeStart', handleStart);
+    router.events.on('routeChangeComplete', handleComplete);
+    router.events.on('routeChangeError', handleComplete);
+
+    return () => {
+      router.events.off('routeChangeStart', handleStart);
+      router.events.off('routeChangeComplete', handleComplete);
+      router.events.off('routeChangeError', handleComplete);
+    };
+  }, [router]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -70,24 +88,32 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
 
   const drawer = (
     <>
-      <Toolbar sx={{ display: 'flex', justifyContent: 'center', padding: theme.spacing(2) }}>
+      <Toolbar sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        padding: theme.spacing(3),
+        borderBottom: `1px solid ${theme.palette.divider}`
+      }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, color: theme.palette.primary.main }}>
+          <Typography variant="h5" sx={{ 
+            fontWeight: 700, 
+            color: theme.palette.primary.main,
+            letterSpacing: '-0.5px'
+          }}>
             AI Scientist
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
             Paper Generator
           </Typography>
         </Box>
       </Toolbar>
-      <Divider />
-      <List>
+      <List sx={{ px: 2, py: 1 }}>
         {navItems.map((item) => {
           const isActive = router.pathname === item.href || 
                            (item.href !== '/' && router.pathname.startsWith(item.href));
           
           return (
-            <ListItem key={item.text} disablePadding>
+            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
               <Link href={item.href} passHref style={{ textDecoration: 'none', width: '100%', color: 'inherit' }}>
                 <ListItemButton 
                   sx={{
@@ -95,18 +121,22 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
                     '&:hover': {
                       bgcolor: isActive ? 'primary.light' : 'rgba(0, 0, 0, 0.04)',
                     },
-                    borderRadius: '0 20px 20px 0',
-                    mr: 1,
+                    borderRadius: 2,
+                    py: 1.5,
                   }}
                 >
-                  <ListItemIcon sx={{ color: isActive ? 'primary.dark' : 'text.secondary' }}>
+                  <ListItemIcon sx={{ 
+                    color: isActive ? 'primary.dark' : 'text.secondary',
+                    minWidth: 40
+                  }}>
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText 
                     primary={item.text} 
                     primaryTypographyProps={{ 
                       fontWeight: isActive ? 600 : 400,
-                      color: isActive ? 'primary.dark' : 'text.primary'
+                      color: isActive ? 'primary.dark' : 'text.primary',
+                      fontSize: '0.95rem'
                     }} 
                   />
                 </ListItemButton>
@@ -119,7 +149,7 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       <CssBaseline />
       <AppBar
         position="fixed"
@@ -127,7 +157,9 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
           bgcolor: 'background.paper',
-          color: 'text.primary'
+          color: 'text.primary',
+          zIndex: theme.zIndex.drawer + 1,
+          borderBottom: `1px solid ${theme.palette.divider}`
         }}
       >
         <Toolbar>
@@ -140,12 +172,23 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" noWrap component="div" sx={{ 
+            flexGrow: 1,
+            fontWeight: 600,
+            color: 'text.primary'
+          }}>
             {title}
           </Typography>
+          {isLoading && (
+            <CircularProgress size={24} sx={{ mr: 2, color: 'primary.main' }} />
+          )}
           <Tooltip title="GitHub Repository">
             <IconButton 
-              sx={{ ml: 1 }}
+              sx={{ 
+                ml: 1,
+                color: 'text.secondary',
+                '&:hover': { color: 'primary.main' }
+              }}
               component="a"
               href="https://github.com/TannedCung/AI-Scientist-UI"
               target="_blank"
@@ -156,7 +199,12 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
           </Tooltip>
           <Tooltip title="User Profile">
             <IconButton sx={{ ml: 1 }}>
-              <Avatar sx={{ bgcolor: 'primary.main', width: 32, height: 32 }}>
+              <Avatar sx={{ 
+                bgcolor: 'primary.main', 
+                width: 32, 
+                height: 32,
+                '&:hover': { bgcolor: 'primary.dark' }
+              }}>
                 <PersonIcon fontSize="small" />
               </Avatar>
             </IconButton>
@@ -174,11 +222,15 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
+            keepMounted: true,
           }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              borderRight: `1px solid ${theme.palette.divider}`
+            },
           }}
         >
           {drawer}
@@ -189,7 +241,11 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
           variant="permanent"
           sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              borderRight: `1px solid ${theme.palette.divider}`
+            },
           }}
           open
         >
@@ -201,12 +257,31 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
         sx={{
           flexGrow: 1,
           p: 3,
-          width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
-          bgcolor: 'background.default',
-          minHeight: '100vh'
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          mt: '64px',
+          position: 'relative',
+          minHeight: 'calc(100vh - 64px)',
+          bgcolor: 'background.default'
         }}
       >
-        <Toolbar />
+        {isLoading && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(255, 255, 255, 0.7)',
+              zIndex: theme.zIndex.drawer - 1
+            }}
+          >
+            <CircularProgress sx={{ color: 'primary.main' }} />
+          </Box>
+        )}
         {children}
       </Box>
     </Box>

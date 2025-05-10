@@ -1,79 +1,61 @@
 import { createTheme } from '@mui/material/styles';
 
-// Get colors from environment variables or use defaults
-const getPrimaryColor = () => {
-  return process.env.NEXT_PUBLIC_PRIMARY_COLOR || '#b8d8d8';
-};
-
-const getSecondaryColor = () => {
-  return process.env.NEXT_PUBLIC_SECONDARY_COLOR || '#ffd5c2';
-};
-
-const getAccentColor = () => {
-  return process.env.NEXT_PUBLIC_ACCENT_COLOR || '#f6c8ea';
-};
-
-// Define our three pastel colors
-const colors = {
-  primary: {
-    main: getPrimaryColor(), // Soft teal or from env
-    light: '#e5f1f1',
-    dark: '#7fb9b9',
-    contrastText: '#2c3e50',
-  },
-  secondary: {
-    main: getSecondaryColor(), // Soft peach or from env
-    light: '#fff0e8',
-    dark: '#ffc09e',
-    contrastText: '#2c3e50',
-  },
-  tertiary: {
-    main: getAccentColor(), // Soft lavender or from env
-    light: '#faeef8',
-    dark: '#e297d3',
-  },
-  background: {
-    default: '#fafafa',
-    paper: '#ffffff',
-  },
-  text: {
-    primary: '#2c3e50',
-    secondary: '#7f8c8d',
-  },
-};
-
-// Create theme
 const theme = createTheme({
   palette: {
-    primary: colors.primary,
-    secondary: colors.secondary,
-    background: colors.background,
-    text: colors.text,
+    primary: {
+      main: '#7B9E87', // Pale green
+      light: '#A3C1A9',
+      dark: '#5A7B63',
+      contrastText: '#FFFFFF',
+    },
+    secondary: {
+      main: '#98B4A3', // Lighter pale green
+      light: '#C5D9CC',
+      dark: '#6B8B7A',
+      contrastText: '#FFFFFF',
+    },
+    background: {
+      default: '#F5F7F6', // Very light green tint
+      paper: '#FFFFFF',
+    },
+    text: {
+      primary: '#2C3E2F', // Dark green
+      secondary: '#5A7B63', // Medium green
+    },
+    error: {
+      main: '#E57373',
+    },
+    warning: {
+      main: '#FFB74D',
+    },
+    success: {
+      main: '#81C784',
+    },
   },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
     h1: {
-      fontWeight: 500,
+      fontWeight: 600,
       fontSize: '2.5rem',
     },
     h2: {
-      fontWeight: 500,
+      fontWeight: 600,
       fontSize: '2rem',
     },
     h3: {
-      fontWeight: 500,
+      fontWeight: 600,
       fontSize: '1.75rem',
     },
     h4: {
-      fontWeight: 500,
+      fontWeight: 600,
       fontSize: '1.5rem',
     },
     h5: {
-      fontWeight: 500,
+      fontWeight: 600,
       fontSize: '1.25rem',
     },
     h6: {
-      fontWeight: 500,
+      fontWeight: 600,
       fontSize: '1rem',
     },
   },
@@ -85,6 +67,10 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
+          borderRadius: 8,
+          padding: '8px 16px',
+        },
+        contained: {
           boxShadow: 'none',
           '&:hover': {
             boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
@@ -95,12 +81,23 @@ const theme = createTheme({
     MuiCard: {
       styleOverrides: {
         root: {
-          boxShadow: '0px 2px 10px rgba(0, 0, 0, 0.05)',
-          transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.1)',
-          },
+          borderRadius: 12,
+          boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+        },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: '#FFFFFF',
+          borderRight: '1px solid rgba(0, 0, 0, 0.08)',
         },
       },
     },

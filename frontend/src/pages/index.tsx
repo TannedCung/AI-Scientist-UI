@@ -31,10 +31,12 @@ const StatsCard = styled(Paper)(({ theme }) => ({
   flexDirection: 'column',
   height: '100%',
   borderRadius: 12,
-  transition: 'transform 0.2s',
+  transition: 'all 0.2s ease-in-out',
+  border: `1px solid ${theme.palette.divider}`,
   '&:hover': {
     transform: 'translateY(-4px)',
     boxShadow: theme.shadows[4],
+    borderColor: theme.palette.primary.light,
   },
 }));
 
@@ -46,6 +48,7 @@ const IconWrapper = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   justifyContent: 'center',
   marginBottom: theme.spacing(2),
+  transition: 'all 0.2s ease-in-out',
 }));
 
 export default function Dashboard() {
@@ -58,12 +61,15 @@ export default function Dashboard() {
     runningExperiments: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null);
+        
         // Fetch ideas
         const ideas = await ideasApi.getAllIdeas();
         setRecentIdeas(ideas.slice(0, 5)); // Get most recent 5 ideas
@@ -85,6 +91,7 @@ export default function Dashboard() {
         });
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        setError('Failed to load dashboard data. Please try again later.');
         enqueueSnackbar('Failed to load dashboard data. Please try again later.', { variant: 'error' });
       } finally {
         setLoading(false);
@@ -102,14 +109,53 @@ export default function Dashboard() {
     );
   }
 
+  if (error) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <ErrorIcon color="error" sx={{ fontSize: 48, mb: 2 }} />
+        <Typography variant="h6" color="error" gutterBottom>
+          {error}
+        </Typography>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => window.location.reload()}
+          sx={{ mt: 2 }}
+        >
+          Retry
+        </Button>
+      </Box>
+    );
+  }
+
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 4,
+        flexWrap: 'wrap',
+        gap: 2
+      }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ 
+          fontWeight: 600,
+          color: 'text.primary'
+        }}>
           Dashboard
         </Typography>
         <Link href="/ideas/create" passHref>
-          <Button variant="contained" color="primary">
+          <Button 
+            variant="contained" 
+            color="primary"
+            sx={{
+              px: 3,
+              py: 1,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 500
+            }}
+          >
             Create New Idea
           </Button>
         </Link>
@@ -120,9 +166,9 @@ export default function Dashboard() {
         <Grid item xs={12} sm={6} md={4}>
           <StatsCard>
             <IconWrapper sx={{ bgcolor: 'primary.light' }}>
-              <LightbulbIcon color="primary" />
+              <LightbulbIcon sx={{ color: 'primary.dark' }} />
             </IconWrapper>
-            <Typography variant="h3" component="div" gutterBottom>
+            <Typography variant="h3" component="div" gutterBottom sx={{ fontWeight: 600 }}>
               {stats.totalIdeas}
             </Typography>
             <Typography variant="body1" color="text.secondary">
@@ -133,9 +179,9 @@ export default function Dashboard() {
         <Grid item xs={12} sm={6} md={4}>
           <StatsCard>
             <IconWrapper sx={{ bgcolor: 'secondary.light' }}>
-              <ScienceIcon color="secondary" />
+              <ScienceIcon sx={{ color: 'secondary.dark' }} />
             </IconWrapper>
-            <Typography variant="h3" component="div" gutterBottom>
+            <Typography variant="h3" component="div" gutterBottom sx={{ fontWeight: 600 }}>
               {stats.totalExperiments}
             </Typography>
             <Typography variant="body1" color="text.secondary">
@@ -145,10 +191,10 @@ export default function Dashboard() {
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <StatsCard>
-            <IconWrapper sx={{ bgcolor: '#e6f7ee' }}>
-              <AutoGraphIcon sx={{ color: '#66BB6A' }} />
+            <IconWrapper sx={{ bgcolor: 'success.light' }}>
+              <AutoGraphIcon sx={{ color: 'success.dark' }} />
             </IconWrapper>
-            <Typography variant="h3" component="div" gutterBottom>
+            <Typography variant="h3" component="div" gutterBottom sx={{ fontWeight: 600 }}>
               {stats.completedExperiments}
             </Typography>
             <Typography variant="body1" color="text.secondary">
@@ -159,8 +205,13 @@ export default function Dashboard() {
       </Grid>
 
       {/* More detailed stats */}
-      <Paper sx={{ p: 3, mb: 4, borderRadius: 2 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper sx={{ 
+        p: 3, 
+        mb: 4, 
+        borderRadius: 2,
+        border: (theme) => `1px solid ${theme.palette.divider}`
+      }}>
+        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
           Experiment Status Overview
         </Typography>
         <Grid container spacing={3}>
@@ -193,10 +244,25 @@ export default function Dashboard() {
 
       {/* Recent Ideas */}
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5">Recent Research Ideas</Typography>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 2,
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>Recent Research Ideas</Typography>
           <Link href="/ideas" passHref>
-            <Button color="primary">View All</Button>
+            <Button 
+              color="primary"
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500
+              }}
+            >
+              View All
+            </Button>
           </Link>
         </Box>
         
@@ -204,11 +270,17 @@ export default function Dashboard() {
           <Grid container spacing={3}>
             {recentIdeas.map((idea) => (
               <Grid item xs={12} key={idea.id}>
-                <Card>
+                <Card sx={{ 
+                  border: (theme) => `1px solid ${theme.palette.divider}`,
+                  '&:hover': {
+                    borderColor: 'primary.light',
+                    boxShadow: (theme) => theme.shadows[4]
+                  }
+                }}>
                   <CardActionArea component={Link} href={`/ideas/${idea.id}`}>
                     <CardContent>
                       <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="h6" component="div">
+                        <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
                           {idea.title}
                         </Typography>
                         <StatusBadge status={idea.status} />
@@ -231,13 +303,27 @@ export default function Dashboard() {
             ))}
           </Grid>
         ) : (
-          <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <Paper sx={{ 
+            p: 3, 
+            textAlign: 'center',
+            border: (theme) => `1px solid ${theme.palette.divider}`
+          }}>
             <Typography variant="body1" color="text.secondary">
               No research ideas yet. Create your first research idea to get started!
             </Typography>
             <Box sx={{ mt: 2 }}>
               <Link href="/ideas/create" passHref>
-                <Button variant="contained" color="primary">
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  sx={{
+                    px: 3,
+                    py: 1,
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 500
+                  }}
+                >
                   Create New Idea
                 </Button>
               </Link>

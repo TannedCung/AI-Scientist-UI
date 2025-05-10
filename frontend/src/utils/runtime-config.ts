@@ -15,20 +15,10 @@ declare global {
   }
 }
 
-// Function to get the runtime configuration
-export function getRuntimeConfig(): RuntimeConfig {
-  if (typeof window !== 'undefined') {
-    // We're in the browser
-    return {
-      apiUrl: window.__RUNTIME_CONFIG__?.apiUrl || process.env.NEXT_PUBLIC_API_URL || '/api'
-    };
-  }
-  
-  // We're on the server
-  return {
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || '/api'
-  };
-}
-
-// Export the current runtime config
-export const runtimeConfig = getRuntimeConfig(); 
+// Get runtime configuration based on environment
+export const runtimeConfig: RuntimeConfig = {
+  // In browser, use window.__RUNTIME_CONFIG__ if available, otherwise use environment variable
+  apiUrl: typeof window !== 'undefined' 
+    ? (window as any).__RUNTIME_CONFIG__?.apiUrl || process.env.NEXT_PUBLIC_API_URL || '/api'
+    : process.env.NEXT_PUBLIC_API_URL || '/api'
+}; 

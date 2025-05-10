@@ -2,8 +2,8 @@ import axios from 'axios';
 import { ResearchIdea, ExperimentRun, ExperimentResult, AIScientistSettings } from '../types/models';
 import { runtimeConfig } from '../utils/runtime-config';
 
-// Get API URL from runtime config, with fallback
-const API_URL = runtimeConfig.apiUrl || '/api';
+// Get API URL from environment variable
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 console.log('Using API URL:', API_URL);
 
