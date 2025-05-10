@@ -106,4 +106,31 @@ docker compose down -v
 When developing, you can use volume mounts to reflect changes in real-time:
 
 1. Changes to frontend code will be reflected after a browser refresh
-2. Backend code changes require restarting the backend container: `docker compose restart backend` 
+2. Backend code changes require restarting the backend container: `docker compose restart backend`
+
+## Network Configuration
+
+The Docker Compose setup uses Nginx as a reverse proxy to manage the traffic between services. This configuration ensures that:
+
+1. **Only the frontend and database are directly exposed** to the outside world
+2. **Backend services are not directly accessible** from outside the Docker network
+3. **All API requests are routed through Nginx** for better security and performance
+
+### Exposed Ports
+
+- **Nginx**: Port 80 (HTTP)
+- **Frontend**: Port 3010
+- **PostgreSQL**: Port 5433
+
+The backend service is only accessible via Nginx and not directly exposed.
+
+### Nginx Configuration
+
+The Nginx service is configured to:
+
+- Route requests to `/api/*` to the backend service
+- Route all other requests to the frontend service
+- Handle WebSocket connections for real-time updates
+- Set appropriate headers for security and performance
+
+To modify the Nginx configuration, you can edit the files in the `nginx/conf.d/` directory. 
