@@ -4,7 +4,7 @@ const nextConfig = {
   swcMinify: true,
   output: 'standalone',
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
     return [
       {
         source: '/api/:path*',
@@ -16,9 +16,9 @@ const nextConfig = {
   trailingSlash: true,
   // Ensure proper page loading
   pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
-  // Add proper error handling
-  onError: (err) => {
-    console.error('Next.js build error:', err);
+  // Add app icon configuration
+  images: {
+    domains: ['localhost'],
   },
 };
 

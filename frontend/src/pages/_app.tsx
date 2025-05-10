@@ -17,35 +17,22 @@ interface MyAppProps extends AppProps {
   emotionCache?: EmotionCache;
 }
 
-export default function MyApp(props: MyAppProps) {
-  const { Component, emotionCache = clientSideEmotionCache, pageProps, router } = props;
-
+export default function App({ Component, pageProps }: AppProps) {
   return (
-    <CacheProvider value={emotionCache}>
-      <Head>
-        <meta name="viewport" content="initial-scale=1, width=device-width" />
-        <title>AI Scientist Paper Generator</title>
-      </Head>
-      <ThemeProvider theme={theme}>
-        <SnackbarProvider 
-          maxSnack={3}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          autoHideDuration={5000}
-        >
-          <CssBaseline />
-          <NextNProgress
-            color={theme.palette.primary.main}
-            startPosition={0.3}
-            stopDelayMs={200}
-            height={3}
-            showOnShallow={true}
-          />
-          <Layout title={getTitle(router.pathname)}>
-            <Component {...pageProps} />
-          </Layout>
-        </SnackbarProvider>
-      </ThemeProvider>
-    </CacheProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <SnackbarProvider
+        maxSnack={3}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+      >
+        <Layout>
+          <Component {...pageProps} />
+        </Layout>
+      </SnackbarProvider>
+    </ThemeProvider>
   );
 }
 

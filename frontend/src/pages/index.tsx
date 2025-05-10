@@ -10,7 +10,12 @@ import {
   Button, 
   Divider,
   CircularProgress,
-  Stack
+  Stack,
+  Alert,
+  AlertTitle,
+  Chip,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Link from 'next/link';
@@ -24,6 +29,7 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDissatisfied';
 import PendingIcon from '@mui/icons-material/Pending';
+import { Error as ErrorIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 
 const StatsCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
