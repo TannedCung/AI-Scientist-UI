@@ -30,6 +30,7 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDissatisfied';
 import PendingIcon from '@mui/icons-material/Pending';
 import { Error as ErrorIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';  
 
 const StatsCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -151,16 +152,10 @@ export default function Dashboard() {
           Dashboard
         </Typography>
         <Link href="/ideas/create" passHref>
-          <Button 
+        <Button 
             variant="contained" 
-            color="primary"
-            sx={{
-              px: 3,
-              py: 1,
-              borderRadius: 2,
-              textTransform: 'none',
-              fontWeight: 500
-            }}
+            color="primary" 
+            startIcon={<AddIcon />}
           >
             Create New Idea
           </Button>
@@ -319,17 +314,11 @@ export default function Dashboard() {
             </Typography>
             <Box sx={{ mt: 2 }}>
               <Link href="/ideas/create" passHref>
-                <Button 
-                  variant="contained" 
-                  color="primary"
-                  sx={{
-                    px: 3,
-                    py: 1,
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    fontWeight: 500
-                  }}
-                >
+              <Button 
+                variant="contained" 
+                color="primary" 
+                startIcon={<AddIcon />}
+              >
                   Create New Idea
                 </Button>
               </Link>
