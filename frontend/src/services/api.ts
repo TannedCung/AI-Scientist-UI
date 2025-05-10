@@ -91,7 +91,7 @@ export const tasksApi = {
 export const settingsApi = {
   // Get current settings
   getSettings: async (): Promise<AIScientistSettings> => {
-    const response = await api.get('/settings');
+    const response = await api.get('/settings/');
     return response.data;
   },
   
