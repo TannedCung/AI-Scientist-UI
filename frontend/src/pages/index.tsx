@@ -21,9 +21,9 @@ import { useSnackbar } from 'notistack';
 import AutoGraphIcon from '@mui/icons-material/AutoGraph';
 import ScienceIcon from '@mui/icons-material/Science';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import SentimentVeryDissatisfiedIcon from '@mui/icons-material/SentimentVeryDissatisfied';
+import PendingIcon from '@mui/icons-material/Pending';
 
 const StatsCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -217,7 +217,7 @@ export default function Dashboard() {
         <Grid container spacing={3}>
           <Grid item xs={12} sm={4}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <CheckCircleIcon sx={{ color: 'success.main', mr: 1 }} />
+              <TaskAltIcon sx={{ color: 'success.main', mr: 1 }} />
               <Typography variant="body1">
                 Completed: {stats.completedExperiments}
               </Typography>
@@ -225,7 +225,7 @@ export default function Dashboard() {
           </Grid>
           <Grid item xs={12} sm={4}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <AccessTimeIcon sx={{ color: 'warning.main', mr: 1 }} />
+              <PendingIcon sx={{ color: 'warning.main', mr: 1 }} />
               <Typography variant="body1">
                 Running: {stats.runningExperiments}
               </Typography>
@@ -233,7 +233,7 @@ export default function Dashboard() {
           </Grid>
           <Grid item xs={12} sm={4}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <ErrorIcon sx={{ color: 'error.main', mr: 1 }} />
+              <SentimentVeryDissatisfiedIcon sx={{ color: 'error.main', mr: 1 }} />
               <Typography variant="body1">
                 Failed: {stats.failedExperiments}
               </Typography>

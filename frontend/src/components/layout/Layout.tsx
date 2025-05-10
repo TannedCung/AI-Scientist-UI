@@ -16,7 +16,8 @@ import {
   useMediaQuery,
   Avatar,
   Tooltip,
-  CircularProgress
+  CircularProgress,
+  Badge
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -34,6 +35,7 @@ interface NavItem {
   text: string;
   icon: React.ReactNode;
   href: string;
+  badge?: number;
 }
 
 const navItems: NavItem[] = [
@@ -98,8 +100,12 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
           <Typography variant="h5" sx={{ 
             fontWeight: 700, 
             color: theme.palette.primary.main,
-            letterSpacing: '-0.5px'
+            letterSpacing: '-0.5px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
           }}>
+            <LightbulbIcon sx={{ fontSize: 28 }} />
             AI Scientist
           </Typography>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -119,7 +125,7 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
                   sx={{
                     bgcolor: isActive ? 'primary.light' : 'transparent',
                     '&:hover': {
-                      bgcolor: isActive ? 'primary.light' : 'rgba(0, 0, 0, 0.04)',
+                      bgcolor: isActive ? 'primary.light' : 'rgba(136, 158, 115, 0.08)',
                     },
                     borderRadius: 2,
                     py: 1.5,
@@ -129,7 +135,13 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
                     color: isActive ? 'primary.dark' : 'text.secondary',
                     minWidth: 40
                   }}>
-                    {item.icon}
+                    {item.badge ? (
+                      <Badge badgeContent={item.badge} color="primary">
+                        {item.icon}
+                      </Badge>
+                    ) : (
+                      item.icon
+                    )}
                   </ListItemIcon>
                   <ListItemText 
                     primary={item.text} 
@@ -175,7 +187,10 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
           <Typography variant="h6" noWrap component="div" sx={{ 
             flexGrow: 1,
             fontWeight: 600,
-            color: 'text.primary'
+            color: 'text.primary',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
           }}>
             {title}
           </Typography>
@@ -187,7 +202,10 @@ export default function Layout({ children, title = 'AI Scientist Paper Generator
               sx={{ 
                 ml: 1,
                 color: 'text.secondary',
-                '&:hover': { color: 'primary.main' }
+                '&:hover': { 
+                  color: 'primary.main',
+                  bgcolor: 'rgba(136, 158, 115, 0.08)'
+                }
               }}
               component="a"
               href="https://github.com/TannedCung/AI-Scientist-UI"
