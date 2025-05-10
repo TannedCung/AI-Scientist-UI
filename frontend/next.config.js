@@ -3,14 +3,22 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   output: 'standalone',
-  rewrites: async () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api';
     return [
       {
         source: '/api/:path*',
         destination: `${apiUrl}/:path*`,
       },
     ];
+  },
+  // Add trailing slashes to prevent 404s
+  trailingSlash: true,
+  // Ensure proper page loading
+  pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
+  // Add proper error handling
+  onError: (err) => {
+    console.error('Next.js build error:', err);
   },
 };
 
