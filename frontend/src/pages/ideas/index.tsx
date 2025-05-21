@@ -31,6 +31,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SortIcon from '@mui/icons-material/Sort';
 import AddIcon from '@mui/icons-material/Add';
+import { websocketService } from '../../services/websocket';
 
 export default function IdeasPage() {
   const [ideas, setIdeas] = useState<ResearchIdea[]>([]);
@@ -58,6 +59,28 @@ export default function IdeasPage() {
     };
 
     fetchIdeas();
+
+    // Subscribe to WebSocket updates for all ideas
+    const handleIdeaUpdate = (updatedIdea: ResearchIdea) => {
+      setIdeas(prevIdeas => {
+        const newIdeas = prevIdeas.map(idea => 
+          idea.id === updatedIdea.id ? updatedIdea : idea
+        );
+        return newIdeas;
+      });
+    };
+
+    // Subscribe to updates for each idea
+    ideas.forEach(idea => {
+      websocketService.subscribeToIdeaUpdates(idea.id, handleIdeaUpdate);
+    });
+
+    // Cleanup subscriptions
+    return () => {
+      ideas.forEach(idea => {
+        websocketService.unsubscribeFromIdeaUpdates(idea.id);
+      });
+    };
   }, [enqueueSnackbar]);
 
   // Filter and sort ideas when search or filters change
