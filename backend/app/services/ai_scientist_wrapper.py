@@ -225,6 +225,7 @@ class AIScientistWrapper:
             
             # Get idea JSON file
             idea_dir = self.ideas_dir / idea_id
+            os.makedirs(idea_dir, exist_ok=True)
             idea_json_path = idea_dir / f"{idea_id}.json"
             
             # Get code file if available
