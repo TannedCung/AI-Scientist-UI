@@ -34,6 +34,7 @@ class ResearchIdea(Base):
     abstract = Column(Text, nullable=False)
     code_file_path = Column(String, nullable=True)
     status = Column(String, nullable=False, default=IdeaStatus.DRAFT)
+    code_url = Column(String, nullable=True)
     generated_ideas = Column(JSONB, nullable=True, default=lambda: {"ideas": [], "metadata": {"generated_at": None, "num_ideas": 0}})
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())

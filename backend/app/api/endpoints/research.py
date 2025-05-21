@@ -67,6 +67,7 @@ async def create_research_idea(
             tldr=tldr,
             abstract=abstract,
             code_file_path=code_file_path,
+            code_url=code_url,
             status=IdeaStatus.DRAFT,
             created_at=datetime.now()
         )

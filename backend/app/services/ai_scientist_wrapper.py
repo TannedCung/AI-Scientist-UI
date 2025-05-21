@@ -230,9 +230,13 @@ class AIScientistWrapper:
             
             # Get code file if available
             code_path = None
+            code = None
             if research_idea.code_file_path:
                 code_path = idea_dir / f"{idea_id}.py"
                 # TODO: Download code file from R2 if needed
+                if code_path.exists():
+                    with open(code_path, "r") as f:
+                        code = f.read()
             
             # Create experiment directory
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -248,7 +252,11 @@ class AIScientistWrapper:
             
             if not ideas:
                 raise Exception("No ideas found. Generate ideas first")
-            # TODO: Add Function: run_experiment for the idea number
+
+            # Add code to idea json if it exists
+            if code is not None:
+                ideas[0]["Code"] = code
+
             # Create ideas JSON file from ideas
             with open(idea_json_path, "w") as f:
                 json.dump(ideas[0], f, indent=4)

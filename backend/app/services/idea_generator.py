@@ -1,12 +1,20 @@
 # Duplicating the code from the ai_scientist repo to avoid saving any files in the submodule
 import argparse
+from datetime import datetime
 import json
+import os
 import os.path as osp
 import re
 import traceback
 from typing import Any, Dict, List
 
 import sys
+import boto3
+from botocore.exceptions import ClientError
+from requests import Session
+
+from app.models.schema import ResearchIdea
+from ..core.config import settings
 
 sys.path.append(osp.join(osp.dirname(__file__), ".."))
 from app.services.AI_Scientist_v2.ai_scientist.llm import (
@@ -146,3 +154,38 @@ def _generate_temp_free_idea(
     ideas = [json.loads(idea_str) for idea_str in previous_ideas]
 
     return ideas
+
+def download_code_from_r2(code_url: str) -> str:
+    """Download code from R2 storage"""
+    if not code_url:
+        return ""
+        
+    try:
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=settings.R2_ENDPOINT,
+            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY
+        )
+        
+        # Extract bucket and key from URL
+        # Assuming URL format: https://<bucket>.<endpoint>/<key>
+        parts = code_url.replace('https://', '').split('/')
+        bucket = parts[0].split('.')[0]
+        key = '/'.join(parts[1:])
+        
+        # Download to temporary file
+        temp_file = f"/tmp/{os.path.basename(key)}"
+        s3_client.download_file(bucket, key, temp_file)
+        
+        # Read content
+        with open(temp_file, 'r') as f:
+            content = f.read()
+            
+        # Clean up
+        os.remove(temp_file)
+        return content
+        
+    except ClientError as e:
+        logger.error(f"Error downloading code from R2: {str(e)}")
+        return ""
