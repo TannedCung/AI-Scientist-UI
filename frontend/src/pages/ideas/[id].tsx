@@ -331,9 +331,9 @@ export default function IdeaDetailPage() {
                     <Card variant="outlined">
                       <CardContent>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Typography variant="subtitle1">
+                          {/* <Typography variant="subtitle1">
                             Experiment #{experiment.id.slice(-6)}
-                          </Typography>
+                          </Typography> */}
                           <StatusBadge status={experiment.status || 'pending'} />
                         </Box>
                         
