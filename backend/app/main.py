@@ -10,7 +10,7 @@ from .api.api import api_router
 from .db.database import engine, Base
 from .models.schema import ResearchIdea, ExperimentRun, ExperimentResult
 from .core.logging import get_logger
-from app.api import ideas, experiments, websockets
+from app.api import websockets
 from app.core.config import settings
 
 # Initialize database tables
@@ -40,9 +40,6 @@ app.add_middleware(
 # Include API router
 app.include_router(api_router, prefix="/api")
 
-# Include routers
-app.include_router(ideas.router, prefix="/api", tags=["ideas"])
-app.include_router(experiments.router, prefix="/api", tags=["experiments"])
 app.include_router(websockets.router, tags=["websockets"])
 
 @app.on_event("startup")
