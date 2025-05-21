@@ -10,6 +10,8 @@ from .api.api import api_router
 from .db.database import engine, Base
 from .models.schema import ResearchIdea, ExperimentRun, ExperimentResult
 from .core.logging import get_logger
+from app.api import ideas, experiments, websockets
+from app.core.config import settings
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
@@ -18,7 +20,7 @@ Base.metadata.create_all(bind=engine)
 logger = get_logger("main")
 
 app = FastAPI(
-    title="AI Scientist Paper Generator",
+    title=settings.PROJECT_NAME,
     description="API for generating workshop-level scientific papers through AI-driven research and experimentation",
     version="1.0.0",
     docs_url="/api/docs",
@@ -29,7 +31,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +39,11 @@ app.add_middleware(
 
 # Include API router
 app.include_router(api_router, prefix="/api")
+
+# Include routers
+app.include_router(ideas.router, prefix="/api", tags=["ideas"])
+app.include_router(experiments.router, prefix="/api", tags=["experiments"])
+app.include_router(websockets.router, tags=["websockets"])
 
 @app.on_event("startup")
 async def startup_event():
